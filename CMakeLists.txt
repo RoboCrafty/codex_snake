@@ -15,3 +15,9 @@ target_compile_options(snake PRIVATE
     -Wextra
     -Wpedantic
 )
+
+add_custom_command(TARGET snake POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_SOURCE_DIR}/snake.conf
+        $<TARGET_FILE_DIR:snake>/snake.conf
+)

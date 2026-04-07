@@ -1,8 +1,10 @@
+#include <array>
 #include <chrono>
 #include <csignal>
 #include <cctype>
 #include <cstdlib>
 #include <deque>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <random>
@@ -41,6 +43,19 @@ namespace
         int maxFrameDelayMs {70};
         int treatsForMaxSpeed {12};
     };
+
+    std::filesystem::path executableDirectory()
+    {
+        std::array<char, 4096> buffer {};
+        const ssize_t length = readlink("/proc/self/exe", buffer.data(), buffer.size() - 1);
+        if (length == -1)
+        {
+            throw std::runtime_error("Failed to resolve executable path.");
+        }
+
+        buffer[static_cast<std::size_t>(length)] = '\0';
+        return std::filesystem::path(buffer.data()).parent_path();
+    }
 
     std::string trim(const std::string& value)
     {
@@ -534,7 +549,8 @@ int main()
     try
     {
         std::signal(SIGINT, SnakeGame::requestStop);
-        const GameConfig config = loadConfig("snake.conf");
+        const std::filesystem::path configPath = executableDirectory() / "snake.conf";
+        const GameConfig config = loadConfig(configPath.string());
         SnakeGame game(config);
         game.run();
     }
