@@ -480,19 +480,19 @@ namespace
 
                     if (x == 0 || x == width_ - 1 || y == 0 || y == height_ - 1)
                     {
-                        std::cout << '#';
+                        std::cout << "# ";
                     }
                     else if (current == apple_)
                     {
-                        std::cout << 'X';
+                        std::cout << "X ";
                     }
                     else if (snake_.occupies(current))
                     {
-                        std::cout << 'O';
+                        std::cout << "O ";
                     }
                     else
                     {
-                        std::cout << ' ';
+                        std::cout << "  ";
                     }
                 }
 
