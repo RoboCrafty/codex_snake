@@ -6,11 +6,15 @@
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <random>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <vector>
+#include <ctime>
 #include <unistd.h>
 #include <termios.h>
 
@@ -168,6 +172,155 @@ namespace
 
         return config;
     }
+
+    std::string formatDuration(std::chrono::milliseconds duration)
+    {
+        const auto totalSeconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        const auto hours = totalSeconds / 3600;
+        const auto minutes = (totalSeconds % 3600) / 60;
+        const auto seconds = totalSeconds % 60;
+
+        std::ostringstream stream;
+        stream << std::setfill('0');
+        if (hours > 0)
+        {
+            stream << hours << ':';
+        }
+
+        stream << std::setw(2) << minutes << ':'
+               << std::setw(2) << seconds;
+        return stream.str();
+    }
+
+    std::string currentTimestamp()
+    {
+        const std::time_t now = std::time(nullptr);
+        const std::tm localTime = *std::localtime(&now);
+
+        std::ostringstream stream;
+        stream << std::put_time(&localTime, "%Y-%m-%d %H:%M:%S");
+        return stream.str();
+    }
+
+    struct GameRecord
+    {
+        std::string timestamp;
+        int score {0};
+        long long durationMs {0};
+    };
+
+    class GameStats
+    {
+    public:
+        explicit GameStats(const std::filesystem::path& filePath)
+            : filePath_(filePath)
+        {
+            load();
+        }
+
+        int highScore() const
+        {
+            return highScore_;
+        }
+
+        std::size_t gameCount() const
+        {
+            return records_.size();
+        }
+
+        bool recordGame(int score, std::chrono::milliseconds duration)
+        {
+            const bool brokeRecord = score > highScore_;
+            if (brokeRecord)
+            {
+                highScore_ = score;
+            }
+
+            records_.push_back(GameRecord {currentTimestamp(), score, duration.count()});
+            save();
+            return brokeRecord;
+        }
+
+    private:
+        void load()
+        {
+            std::ifstream input(filePath_);
+            if (!input)
+            {
+                return;
+            }
+
+            std::string line;
+            while (std::getline(input, line))
+            {
+                const std::string cleanedLine = trim(line);
+                if (cleanedLine.empty() || cleanedLine[0] == '#')
+                {
+                    continue;
+                }
+
+                if (cleanedLine.rfind("high_score=", 0) == 0)
+                {
+                    highScore_ = parseInteger("high_score", cleanedLine.substr(std::string("high_score=").size()));
+                    continue;
+                }
+
+                if (cleanedLine.rfind("games_played=", 0) == 0)
+                {
+                    continue;
+                }
+
+                const std::size_t firstSeparator = cleanedLine.find('|');
+                const std::size_t scoreSeparator = cleanedLine.find("|score=", firstSeparator == std::string::npos ? 0 : firstSeparator);
+                const std::size_t durationSeparator = cleanedLine.find("|duration_ms=", scoreSeparator == std::string::npos ? 0 : scoreSeparator);
+                if (firstSeparator == std::string::npos || scoreSeparator == std::string::npos || durationSeparator == std::string::npos)
+                {
+                    continue;
+                }
+
+                GameRecord record;
+                record.timestamp = cleanedLine.substr(0, firstSeparator);
+                record.score = parseInteger("score", cleanedLine.substr(scoreSeparator + 7, durationSeparator - (scoreSeparator + 7)));
+                record.durationMs = static_cast<long long>(std::stoll(cleanedLine.substr(durationSeparator + 13)));
+                records_.push_back(record);
+            }
+
+            if (highScore_ == 0 && !records_.empty())
+            {
+                for (const GameRecord& record : records_)
+                {
+                    if (record.score > highScore_)
+                    {
+                        highScore_ = record.score;
+                    }
+                }
+            }
+        }
+
+        void save() const
+        {
+            std::ofstream output(filePath_, std::ios::trunc);
+            if (!output)
+            {
+                throw std::runtime_error("Failed to write stats file: " + filePath_.string());
+            }
+
+            output << "high_score=" << highScore_ << '\n';
+            output << "games_played=" << records_.size() << '\n';
+            output << "# timestamp|score|duration_ms\n";
+            for (const GameRecord& record : records_)
+            {
+                output << record.timestamp
+                       << "|score=" << record.score
+                       << "|duration_ms=" << record.durationMs
+                       << '\n';
+            }
+        }
+
+        std::filesystem::path filePath_;
+        int highScore_ {0};
+        std::vector<GameRecord> records_ {};
+    };
 
     class TerminalController
     {
@@ -346,11 +499,12 @@ namespace
     class SnakeGame
     {
     public:
-        explicit SnakeGame(const GameConfig& config)
+        SnakeGame(const GameConfig& config, GameStats& stats)
             : width_(config.boardWidth),
               height_(config.boardHeight),
               config_(config),
               snake_(config.boardWidth, config.boardHeight),
+              stats_(stats),
               randomEngine_(std::random_device {}())
         {
             spawnApple();
@@ -358,6 +512,7 @@ namespace
 
         void run()
         {
+            gameStart_ = std::chrono::steady_clock::now();
             render();
 
             while (running_)
@@ -368,7 +523,10 @@ namespace
                 std::this_thread::sleep_for(currentFrameDelay());
             }
 
-            renderGameOver();
+            const auto gameDuration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - gameStart_);
+            const bool brokeRecord = stats_.recordGame(score_, gameDuration);
+            renderGameOver(gameDuration, brokeRecord);
         }
 
         static void requestStop(int)
@@ -474,6 +632,7 @@ namespace
             std::cout << "\033[2J\033[H";
             std::cout
                 << "Snake  |  Score: " << score_
+                << "  |  High: " << stats_.highScore()
                 << "  |  Delay: " << currentFrameDelay().count() << "ms"
                 << "  |  Move: WASD  |  Quit: Q\n";
 
@@ -511,22 +670,29 @@ namespace
             std::cout.flush();
         }
 
-        void renderGameOver()
+        void renderGameOver(std::chrono::milliseconds gameDuration, bool brokeRecord)
         {
             terminal_.restore();
 
             if (won_)
             {
-                std::cout << "\nYou filled the board. Final score: " << score_ << '\n';
+                std::cout << "\nYou filled the board.";
             }
             else if (quitRequested_)
             {
-                std::cout << "\nThanks for playing. Final score: " << score_ << '\n';
+                std::cout << "\nThanks for playing.";
             }
             else
             {
-                std::cout << "\nGame over. Final score: " << score_ << '\n';
+                std::cout << "\nGame over.";
             }
+
+            std::cout << "\nScore: " << score_
+                      << "\nPlayed: " << formatDuration(gameDuration)
+                      << "\nHigh score: " << stats_.highScore()
+                      << "\nRecord: " << (brokeRecord ? "new record!" : "no new record")
+                      << "\nGames logged: " << stats_.gameCount()
+                      << '\n';
         }
 
         std::chrono::milliseconds currentFrameDelay() const
@@ -542,6 +708,7 @@ namespace
         const int height_;
         const GameConfig config_;
         Snake snake_;
+        GameStats& stats_;
         Position apple_ {};
         TerminalController terminal_ {};
         int score_ {0};
@@ -549,6 +716,7 @@ namespace
         bool won_ {false};
         bool quitRequested_ {false};
         std::mt19937 randomEngine_;
+        std::chrono::steady_clock::time_point gameStart_ {};
         static inline volatile std::sig_atomic_t interrupted_ {0};
     };
 }
@@ -559,8 +727,10 @@ int main()
     {
         std::signal(SIGINT, SnakeGame::requestStop);
         const std::filesystem::path configPath = executableDirectory() / "snake.conf";
+        const std::filesystem::path statsPath = executableDirectory() / "snake_stats.txt";
         const GameConfig config = loadConfig(configPath.string());
-        SnakeGame game(config);
+        GameStats stats(statsPath);
+        SnakeGame game(config, stats);
         game.run();
     }
     catch (const std::exception& exception)
