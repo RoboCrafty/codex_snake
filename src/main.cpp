@@ -246,6 +246,11 @@ namespace
             return body_;
         }
 
+        const Position& head() const
+        {
+            return body_.front();
+        }
+
         Direction direction() const
         {
             return direction_;
@@ -481,6 +486,10 @@ namespace
                     if (x == 0 || x == width_ - 1 || y == 0 || y == height_ - 1)
                     {
                         std::cout << "# ";
+                    }
+                    else if (current == snake_.head())
+                    {
+                        std::cout << "@ ";
                     }
                     else if (current == apple_)
                     {
