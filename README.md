@@ -1,8 +1,16 @@
 # Cnake
 
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-00599C.svg)](https://en.cppreference.com/w/cpp/17)
+[![CMake 3.16+](https://img.shields.io/badge/CMake-3.16%2B-064F8C.svg)](https://cmake.org/)
+
 ![Cnake teaser](snake_teaser.png)
 
 Minimal terminal Snake game written in C++17.
+
+## License
+
+GPLv3. See [LICENSE](LICENSE) for details.
 
 ## Get The Code
 
