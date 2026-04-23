@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(snake_terminal LANGUAGES CXX)
+project(codex_snake LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,5 +19,5 @@ target_compile_options(snake PRIVATE
 add_custom_command(TARGET snake POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         ${CMAKE_SOURCE_DIR}/snake.conf
-        $<TARGET_FILE_DIR:snake>/snake.conf
+        $<TARGET_FILE_DIR:snake>/cnake.conf
 )
