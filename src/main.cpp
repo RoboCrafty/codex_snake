@@ -382,10 +382,10 @@ namespace
         bool restored_ {false};
     };
 
-    class Snake
+    class Cnake
     {
     public:
-        Snake(int boardWidth, int boardHeight)
+        Cnake(int boardWidth, int boardHeight)
         {
             const int startX = boardWidth / 2;
             const int startY = boardHeight / 2;
@@ -496,14 +496,14 @@ namespace
         Direction direction_ {Direction::Right};
     };
 
-    class SnakeGame
+    class CnakeGame
     {
     public:
-        SnakeGame(const GameConfig& config, GameStats& stats)
+        CnakeGame(const GameConfig& config, GameStats& stats)
             : width_(config.boardWidth),
               height_(config.boardHeight),
               config_(config),
-              snake_(config.boardWidth, config.boardHeight),
+              cnake_(config.boardWidth, config.boardHeight),
               stats_(stats),
               randomEngine_(std::random_device {}())
         {
@@ -542,19 +542,19 @@ namespace
             {
                 case 'w':
                 case 'W':
-                    snake_.setDirection(Direction::Up);
+                    cnake_.setDirection(Direction::Up);
                     break;
                 case 's':
                 case 'S':
-                    snake_.setDirection(Direction::Down);
+                    cnake_.setDirection(Direction::Down);
                     break;
                 case 'a':
                 case 'A':
-                    snake_.setDirection(Direction::Left);
+                    cnake_.setDirection(Direction::Left);
                     break;
                 case 'd':
                 case 'D':
-                    snake_.setDirection(Direction::Right);
+                    cnake_.setDirection(Direction::Right);
                     break;
                 case 'q':
                 case 'Q':
@@ -579,7 +579,7 @@ namespace
                 return;
             }
 
-            const Position nextHead = snake_.nextHeadPosition();
+            const Position nextHead = cnake_.nextHeadPosition();
             if (hitsWall(nextHead))
             {
                 running_ = false;
@@ -587,9 +587,9 @@ namespace
             }
 
             const bool ateApple = nextHead == apple_;
-            snake_.advance(ateApple);
+            cnake_.advance(ateApple);
 
-            if (snake_.hitsItself())
+            if (cnake_.hitsItself())
             {
                 running_ = false;
                 return;
@@ -598,7 +598,7 @@ namespace
             if (ateApple)
             {
                 ++score_;
-                if (snake_.length() == static_cast<std::size_t>((width_ - 2) * (height_ - 2)))
+                if (cnake_.length() == static_cast<std::size_t>((width_ - 2) * (height_ - 2)))
                 {
                     won_ = true;
                     running_ = false;
@@ -624,14 +624,14 @@ namespace
             {
                 apple_ = {xDistribution(randomEngine_), yDistribution(randomEngine_)};
             }
-            while (snake_.occupies(apple_));
+            while (cnake_.occupies(apple_));
         }
 
         void render() const
         {
             std::cout << "\033[2J\033[H";
             std::cout
-                << "Snake  |  Score: " << score_
+                << "Cnake  |  Score: " << score_
                 << "  |  High: " << stats_.highScore()
                 << "  |  Delay: " << currentFrameDelay().count() << "ms"
                 << "  |  Move: WASD  |  Quit: Q\n";
@@ -646,7 +646,7 @@ namespace
                     {
                         std::cout << "# ";
                     }
-                    else if (current == snake_.head())
+                    else if (current == cnake_.head())
                     {
                         std::cout << "@ ";
                     }
@@ -654,7 +654,7 @@ namespace
                     {
                         std::cout << "X ";
                     }
-                    else if (snake_.occupies(current))
+                    else if (cnake_.occupies(current))
                     {
                         std::cout << "O ";
                     }
@@ -707,7 +707,7 @@ namespace
         const int width_;
         const int height_;
         const GameConfig config_;
-        Snake snake_;
+        Cnake cnake_;
         GameStats& stats_;
         Position apple_ {};
         TerminalController terminal_ {};
@@ -725,12 +725,12 @@ int main()
 {
     try
     {
-        std::signal(SIGINT, SnakeGame::requestStop);
-        const std::filesystem::path configPath = executableDirectory() / "snake.conf";
-        const std::filesystem::path statsPath = executableDirectory() / "snake_stats.txt";
+        std::signal(SIGINT, CnakeGame::requestStop);
+        const std::filesystem::path configPath = executableDirectory() / "cnake.conf";
+        const std::filesystem::path statsPath = executableDirectory() / "cnake_stats.txt";
         const GameConfig config = loadConfig(configPath.string());
         GameStats stats(statsPath);
-        SnakeGame game(config, stats);
+        CnakeGame game(config, stats);
         game.run();
     }
     catch (const std::exception& exception)
